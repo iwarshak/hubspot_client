@@ -177,6 +177,29 @@ defmodule HubspotClient.ObjectsTest do
       assert {:error, %HubspotClient.Error{status: 400, category: "VALIDATION_ERROR"}} =
                Objects.search(client, "deals", %{"after" => "10001"})
     end
+
+    test "retries a 429 on the search POST" do
+      client =
+        HubspotClient.new(
+          token: "t",
+          req_options: [
+            plug: {Req.Test, HubspotClient},
+            retry_delay: 1
+          ]
+        )
+
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        case Agent.get_and_update(counter, fn n -> {n, n + 1} end) do
+          0 -> conn |> Plug.Conn.put_status(429) |> Req.Test.json(%{"message" => "slow down"})
+          _ -> Req.Test.json(conn, %{"results" => []})
+        end
+      end)
+
+      assert {:ok, _} = Objects.search(client, "deals", %{"limit" => 1})
+      assert Agent.get(counter, & &1) == 2
+    end
   end
 
   describe "batch_read/4" do

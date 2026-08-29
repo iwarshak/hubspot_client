@@ -60,7 +60,7 @@ defmodule HubspotClient.Request do
   defp run(request) do
     case Req.request(request) do
       {:ok, %Req.Response{status: status, body: body}} when status in 200..299 ->
-        {:ok, body}
+        if is_map(body), do: {:ok, body}, else: {:error, Error.from_response(status, body)}
 
       {:ok, %Req.Response{status: status, body: body}} ->
         {:error, Error.from_response(status, body)}

@@ -40,16 +40,23 @@ defmodule HubspotClient.OwnersTest do
     assert owner.created_at == ~U[2026-01-01 00:00:00Z]
   end
 
-  test "list/2 forwards limit, after, and archived", %{client: client} do
+  test "list/2 forwards limit, after, archived, and email", %{client: client} do
     Req.Test.stub(HubspotClient, fn conn ->
       conn = Plug.Conn.fetch_query_params(conn)
       assert conn.query_params["limit"] == "50"
       assert conn.query_params["after"] == "c1"
       assert conn.query_params["archived"] == "true"
+      assert conn.query_params["email"] == "rep@example.com"
       Req.Test.json(conn, %{"results" => []})
     end)
 
-    assert {:ok, _} = Owners.list(client, limit: 50, after: "c1", archived: true)
+    assert {:ok, _} =
+             Owners.list(client,
+               limit: 50,
+               after: "c1",
+               archived: true,
+               email: "rep@example.com"
+             )
   end
 
   test "get/3 reads a single owner", %{client: client} do

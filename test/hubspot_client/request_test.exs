@@ -133,6 +133,16 @@ defmodule HubspotClient.RequestTest do
 
       assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
     end
+
+    test "a 200 with a non-map body returns an error instead of raising", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/html")
+        |> Plug.Conn.send_resp(200, "<html>hi</html>")
+      end)
+
+      assert {:error, %Error{status: 200}} = Request.get(client, "/crm/v3/objects/deals")
+    end
   end
 
   describe "post/3" do
