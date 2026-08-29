@@ -256,13 +256,16 @@ Fixtures are trimmed real HubSpot response bodies.
 
 ## Dependencies
 
+- `telemetry ~> 1.0` — runtime. For emitting rate-limit events on every response.
+  Already in the tree transitively (req → finch → telemetry), but declared
+  explicitly here because this library calls `:telemetry.execute/3`.
 - `req ~> 0.7` — runtime (0.7.4 current as of this writing; brings in `finch`,
   `jason`, and `mime`)
 - `plug ~> 1.0` — test only. `req` declares `plug` optional, and `Req.Test` needs it,
   so the test stubs do not work without adding it here.
 - `ex_doc` — dev only, for docs
 
-Nothing else. `req` requires Elixir ~> 1.15; this project targets ~> 1.20.
+`req` requires Elixir ~> 1.15; this project targets ~> 1.20.
 
 ## Out of scope
 

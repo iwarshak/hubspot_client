@@ -129,6 +129,20 @@ Starter, plus a much tighter 5 requests per second shared across all `search`
 endpoints. The client retries 429 and 5xx responses and honors `Retry-After`.
 Override with `req_options: [retry: false]` if you want to handle it yourself.
 
+Every response carries HubSpot's rate-limit headers. This library emits a
+telemetry event so you can self-pace instead of only reacting to 429s:
+
+```elixir
+:telemetry.attach("hubspot-rate-limit", [:hubspot_client, :rate_limit], fn _e, m, meta, _ ->
+  if m.remaining < 20, do: Logger.warning("HubSpot budget low")
+end, nil)
+```
+
+The event measurements are `remaining`, `max`, and `interval_ms`, parsed from the
+response headers when present. The metadata carries `method` (`:get` or `:post`),
+`path`, and `status` (including 429s). The library does no proactive throttling —
+this event is what lets a caller throttle itself.
+
 ## Testing against this library
 
 Pass a `Req.Test` stub through `:req_options`:

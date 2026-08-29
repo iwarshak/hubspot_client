@@ -40,7 +40,9 @@ defmodule HubspotClient do
     * `:base_url` - defaults to `#{@default_base_url}`.
     * `:req_options` - merged into every `Req` request, overriding this
       library's defaults. Use it to set `:plug` in tests, or to override
-      `:retry` and `:receive_timeout`.
+      `:retry` and `:receive_timeout`. The keys `:method`, `:json`, `:body`,
+      and `:form` are ignored here; this library is read-only and those keys
+      are stripped so no option can turn a documented read into a write.
 
   Raises `ArgumentError` when `:token` is not a non-empty string. This is a
   setup mistake rather than a runtime condition, so it raises; every other
