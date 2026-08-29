@@ -13,12 +13,8 @@ defmodule HubspotClient.Request do
   """
   @spec get(HubspotClient.t(), String.t(), keyword()) :: {:ok, term()} | {:error, Exception.t()}
   def get(%HubspotClient{} = client, path, params \\ []) do
-    # Passing `params: []` would still append a "?" to the URL. Omit the option
-    # entirely when there is nothing to encode.
-    options = if params == [], do: [url: path], else: [url: path, params: params]
-
     client
-    |> build(options)
+    |> build(url: path, params: params)
     |> run()
   end
 

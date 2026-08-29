@@ -92,6 +92,15 @@ defmodule HubspotClient.RequestTest do
 
       assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
     end
+
+    test "sends no query string when no params are given", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.query_string == ""
+        Req.Test.json(conn, %{})
+      end)
+
+      assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
+    end
   end
 
   describe "post/3" do
