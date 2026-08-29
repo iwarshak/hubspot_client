@@ -213,11 +213,17 @@ Limits are 190 requests per 10 seconds on Professional and Enterprise, 100 on Fr
 and Starter, with a separate and much tighter 5 requests per second shared across all
 search endpoints.
 
-The client sets Req's `retry: :safe_transient`, which retries 429 and 5xx responses
-and honors `Retry-After`. No custom rate limiter and no token bucket: Req's behavior
-covers the realistic failure mode, and callers who need more can override `:retry`
-through `:req_options`. The 5/second search limit is documented so callers driving
-search in a tight loop know why they are seeing 429s.
+The client sets Req's `retry: :transient`, which retries 408/429/500/502/503/504 and
+derives its delay from the `Retry-After` header on 429 and 503. Req's default is
+`:safe_transient`, which retries only GET and HEAD — that would leave `search` and
+`batch_read` unretried, since both are POST. Every request this library issues is a
+read and therefore idempotent, so retrying POSTs is safe here and `:transient` is the
+correct setting. This is the one Req default the library deliberately overrides.
+
+No custom rate limiter and no token bucket: Req's behavior covers the realistic
+failure mode, and callers who need more can override `:retry` through `:req_options`.
+The 5/second search limit is documented so callers driving search in a tight loop know
+why they are seeing 429s.
 
 ## Testing
 
@@ -236,10 +242,13 @@ Fixtures are trimmed real HubSpot response bodies.
 
 ## Dependencies
 
-- `req ~> 0.5` — runtime
-- `ex_doc` — dev only
+- `req ~> 0.7` — runtime (0.7.4 current as of this writing; brings in `finch`,
+  `jason`, and `mime`)
+- `plug ~> 1.0` — test only. `req` declares `plug` optional, and `Req.Test` needs it,
+  so the test stubs do not work without adding it here.
+- `ex_doc` — dev only, for docs
 
-Nothing else.
+Nothing else. `req` requires Elixir ~> 1.15; this project targets ~> 1.20.
 
 ## Out of scope
 
