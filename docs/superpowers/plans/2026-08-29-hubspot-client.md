@@ -767,12 +767,8 @@ defmodule HubspotClient.Request do
   """
   @spec get(HubspotClient.t(), String.t(), keyword()) :: {:ok, term()} | {:error, Exception.t()}
   def get(%HubspotClient{} = client, path, params \\ []) do
-    # Passing `params: []` would still append a "?" to the URL. Omit the option
-    # entirely when there is nothing to encode.
-    options = if params == [], do: [url: path], else: [url: path, params: params]
-
     client
-    |> build(options)
+    |> build(url: path, params: params)
     |> run()
   end
 
@@ -1022,7 +1018,6 @@ defmodule HubspotClient.Objects do
   alias HubspotClient.{Request, Response}
 
   @param_keys [:limit, :after, :properties, :properties_with_history, :associations, :archived]
-  @stream_page_size 100
 
   @doc """
   Lists one page of objects.
@@ -1403,7 +1398,15 @@ Expected: FAIL — `Objects.stream/2 is undefined`.
 
 - [ ] **Step 3: Write the implementation**
 
-Add to `lib/hubspot_client/objects.ex`, after `batch_read/4`:
+Add the page-size attribute beside the existing `@param_keys` at the top of the
+module — this task is its first and only consumer, so it is introduced here
+rather than earlier:
+
+```elixir
+  @stream_page_size 100
+```
+
+Then add to `lib/hubspot_client/objects.ex`, after `batch_read/4`:
 
 ```elixir
   @doc """
