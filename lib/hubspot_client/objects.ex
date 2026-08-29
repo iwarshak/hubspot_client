@@ -28,6 +28,7 @@ defmodule HubspotClient.Objects do
   alias HubspotClient.{Request, Response}
 
   @param_keys [:limit, :after, :properties, :properties_with_history, :associations, :archived]
+  @stream_page_size 100
 
   @doc """
   Lists one page of objects.
@@ -99,6 +100,47 @@ defmodule HubspotClient.Objects do
     with {:ok, response} <- Request.post(client, base_path(type) <> "/batch/read", body) do
       {:ok, Response.collection(response, &Response.object/1)}
     end
+  end
+
+  @doc """
+  Streams every object, following paging cursors until they run out.
+
+  The stream is lazy, so `Enum.take(stream, 250)` issues three requests and
+  stops. `:limit` defaults to #{@stream_page_size}, HubSpot's maximum for list
+  endpoints, because the API's own default of 10 would multiply the request
+  count tenfold.
+
+  Unlike every other function here, this one **raises** — `HubspotClient.Error`
+  on an API error, `Req.TransportError` on a network failure. A stream cannot
+  yield `{:error, reason}` without forcing every consumer to pattern-match each
+  element, which would make the common case worse to serve the rare one.
+
+      client
+      |> HubspotClient.Objects.stream("deals", properties: ["dealname", "amount"])
+      |> Stream.map(& &1.properties["dealname"])
+      |> Enum.take(500)
+  """
+  @spec stream(HubspotClient.t(), String.t(), keyword()) :: Enumerable.t()
+  def stream(client, type, opts \\ []) do
+    opts = Keyword.put_new(opts, :limit, @stream_page_size)
+
+    Stream.resource(
+      fn -> :first_page end,
+      fn
+        :done ->
+          {:halt, :done}
+
+        cursor ->
+          opts = if cursor == :first_page, do: opts, else: Keyword.put(opts, :after, cursor)
+
+          case list(client, type, opts) do
+            {:ok, %{results: results, after: nil}} -> {results, :done}
+            {:ok, %{results: results, after: next}} -> {results, next}
+            {:error, exception} -> raise exception
+          end
+      end,
+      fn _state -> :ok end
+    )
   end
 
   @doc false
