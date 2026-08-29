@@ -159,4 +159,138 @@ defmodule HubspotClient.RequestTest do
                Request.post(client, "/crm/v3/objects/deals/search", %{"limit" => 10})
     end
   end
+
+  describe "telemetry" do
+    test "emits rate-limit event on 200 with all three headers", %{client: client} do
+      handler_id = "test_rate_limit_200"
+      ref = make_ref()
+
+      :telemetry.attach(
+        handler_id,
+        [:hubspot_client, :rate_limit],
+        fn _event, measurements, metadata, _ ->
+          send(self(), {:telemetry, ref, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-remaining", "189")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-max", "190")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-interval-milliseconds", "10000")
+        |> Req.Test.json(%{"results" => []})
+      end)
+
+      assert {:ok, %{"results" => []}} = Request.get(client, "/crm/v3/objects/deals")
+
+      assert_receive {:telemetry, ^ref, measurements, metadata}
+      assert measurements == %{remaining: 189, max: 190, interval_ms: 10_000}
+      assert metadata.method == :get
+      assert metadata.path == "/crm/v3/objects/deals"
+      assert metadata.status == 200
+    end
+
+    test "emits rate-limit event on 429 with headers", %{client: client} do
+      handler_id = "test_rate_limit_429"
+      ref = make_ref()
+
+      :telemetry.attach(
+        handler_id,
+        [:hubspot_client, :rate_limit],
+        fn _event, measurements, metadata, _ ->
+          send(self(), {:telemetry, ref, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-remaining", "0")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-max", "190")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-interval-milliseconds", "10000")
+        |> Plug.Conn.put_status(429)
+        |> Req.Test.json(%{"message" => "rate limited"})
+      end)
+
+      assert {:error, %Error{status: 429}} = Request.get(client, "/crm/v3/objects/deals")
+
+      assert_receive {:telemetry, ^ref, measurements, metadata}
+      assert measurements == %{remaining: 0, max: 190, interval_ms: 10_000}
+      assert metadata.method == :get
+      assert metadata.path == "/crm/v3/objects/deals"
+      assert metadata.status == 429
+    end
+
+    test "does not emit event when no rate-limit headers present", %{client: client} do
+      handler_id = "test_rate_limit_no_headers"
+      ref = make_ref()
+
+      :telemetry.attach(
+        handler_id,
+        [:hubspot_client, :rate_limit],
+        fn _event, _measurements, _metadata, _ ->
+          send(self(), {:telemetry, ref})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        Req.Test.json(conn, %{"results" => []})
+      end)
+
+      assert {:ok, %{"results" => []}} = Request.get(client, "/crm/v3/objects/deals")
+
+      refute_receive {:telemetry, ^ref}, 100
+    end
+
+    test "emits only keys that parsed from headers", %{client: client} do
+      handler_id = "test_rate_limit_partial"
+      ref = make_ref()
+
+      :telemetry.attach(
+        handler_id,
+        [:hubspot_client, :rate_limit],
+        fn _event, measurements, metadata, _ ->
+          send(self(), {:telemetry, ref, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-remaining", "50")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-max", "not-a-number")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-interval-milliseconds", "10000")
+        |> Req.Test.json(%{"results" => []})
+      end)
+
+      assert {:ok, %{"results" => []}} = Request.get(client, "/crm/v3/objects/deals")
+
+      assert_receive {:telemetry, ^ref, measurements, metadata}
+      assert measurements == %{remaining: 50, interval_ms: 10_000}
+      refute Map.has_key?(measurements, :max)
+      assert metadata.status == 200
+    end
+
+    test "request returns normal result when no handler attached", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-remaining", "189")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-max", "190")
+        |> Plug.Conn.put_resp_header("x-hubspot-ratelimit-interval-milliseconds", "10000")
+        |> Req.Test.json(%{"results" => []})
+      end)
+
+      assert {:ok, %{"results" => []}} = Request.get(client, "/crm/v3/objects/deals")
+    end
+  end
 end

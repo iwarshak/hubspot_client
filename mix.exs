@@ -23,6 +23,7 @@ defmodule HubspotClient.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:telemetry, "~> 1.0"},
       {:req, "~> 0.7"},
       {:plug, "~> 1.0", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
