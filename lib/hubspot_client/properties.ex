@@ -15,7 +15,7 @@ defmodule HubspotClient.Properties do
   This endpoint does not paginate.
   """
 
-  alias HubspotClient.{Request, Response}
+  alias HubspotClient.{Request, Response, URL}
 
   @doc """
   Lists every property defined for an object type.
@@ -35,12 +35,10 @@ defmodule HubspotClient.Properties do
           {:ok, map()} | {:error, Exception.t()}
   def get(client, object_type, property_name, _opts \\ []) do
     with {:ok, body} <-
-           Request.get(client, base_path(object_type) <> "/" <> segment(property_name)) do
+           Request.get(client, base_path(object_type) <> "/" <> URL.segment(property_name)) do
       {:ok, Response.metadata(body)}
     end
   end
 
-  defp base_path(object_type), do: "/crm/v3/properties/" <> segment(object_type)
-
-  defp segment(value), do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+  defp base_path(object_type), do: "/crm/v3/properties/" <> URL.segment(object_type)
 end

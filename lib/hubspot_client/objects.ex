@@ -25,7 +25,7 @@ defmodule HubspotClient.Objects do
   Unrecognized options are ignored rather than forwarded.
   """
 
-  alias HubspotClient.{Request, Response}
+  alias HubspotClient.{Request, Response, URL}
 
   @param_keys [:limit, :after, :properties, :properties_with_history, :associations, :archived]
   @stream_page_size 100
@@ -47,7 +47,8 @@ defmodule HubspotClient.Objects do
   @spec get(HubspotClient.t(), String.t(), String.t() | integer(), keyword()) ::
           {:ok, map()} | {:error, Exception.t()}
   def get(client, type, id, opts \\ []) do
-    with {:ok, body} <- Request.get(client, base_path(type) <> "/" <> segment(id), params(opts)) do
+    with {:ok, body} <-
+           Request.get(client, base_path(type) <> "/" <> URL.segment(id), params(opts)) do
       {:ok, Response.object(body)}
     end
   end
@@ -143,11 +144,9 @@ defmodule HubspotClient.Objects do
     )
   end
 
-  @doc false
-  def base_path(type), do: "/crm/v3/objects/" <> segment(type)
+  defp base_path(type), do: "/crm/v3/objects/" <> URL.segment(type)
 
-  @doc false
-  def params(opts) do
+  defp params(opts) do
     opts
     |> Keyword.take(@param_keys)
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -159,10 +158,6 @@ defmodule HubspotClient.Objects do
 
   defp join(value) when is_list(value), do: Enum.join(value, ",")
   defp join(value), do: value
-
-  defp segment(value) do
-    value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
-  end
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

@@ -9,7 +9,7 @@ defmodule HubspotClient.Owners do
   the `%{results: ..., after: ...}` envelope.
   """
 
-  alias HubspotClient.{Request, Response}
+  alias HubspotClient.{Request, Response, URL}
 
   @param_keys [:limit, :after, :archived, :email]
 
@@ -37,7 +37,7 @@ defmodule HubspotClient.Owners do
   @spec get(HubspotClient.t(), String.t() | integer(), keyword()) ::
           {:ok, map()} | {:error, Exception.t()}
   def get(client, owner_id, opts \\ []) do
-    path = "/crm/v3/owners/" <> (owner_id |> to_string() |> URI.encode(&URI.char_unreserved?/1))
+    path = "/crm/v3/owners/" <> URL.segment(owner_id)
 
     with {:ok, body} <- Request.get(client, path, params(opts)) do
       {:ok, Response.metadata(body)}

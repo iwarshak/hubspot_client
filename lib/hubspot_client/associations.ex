@@ -19,7 +19,7 @@ defmodule HubspotClient.Associations do
   This endpoint paginates.
   """
 
-  alias HubspotClient.{Request, Response}
+  alias HubspotClient.{Request, Response, URL}
 
   @param_keys [:limit, :after]
 
@@ -36,8 +36,8 @@ defmodule HubspotClient.Associations do
   def list(client, from_type, from_id, to_type, opts \\ []) do
     path =
       "/crm/v4/objects/" <>
-        segment(from_type) <>
-        "/" <> segment(from_id) <> "/associations/" <> segment(to_type)
+        URL.segment(from_type) <>
+        "/" <> URL.segment(from_id) <> "/associations/" <> URL.segment(to_type)
 
     with {:ok, body} <- Request.get(client, path, params(opts)) do
       {:ok, Response.paged(body, &Response.metadata/1)}
@@ -49,6 +49,4 @@ defmodule HubspotClient.Associations do
     |> Keyword.take(@param_keys)
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
   end
-
-  defp segment(value), do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
 end

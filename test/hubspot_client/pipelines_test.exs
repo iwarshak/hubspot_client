@@ -76,6 +76,15 @@ defmodule HubspotClient.PipelinesTest do
              Pipelines.stages(client, "deals", "default")
   end
 
+  test "percent-encodes pipeline ids that need it", %{client: client} do
+    Req.Test.stub(HubspotClient, fn conn ->
+      assert conn.request_path == "/crm/v3/pipelines/deals/a%20b/stages"
+      Req.Test.json(conn, %{"results" => []})
+    end)
+
+    assert {:ok, []} = Pipelines.stages(client, "deals", "a b")
+  end
+
   test "propagates errors", %{client: client} do
     Req.Test.stub(HubspotClient, fn conn ->
       conn |> Plug.Conn.put_status(403) |> Req.Test.json(%{"message" => "missing scope"})

@@ -15,7 +15,7 @@ defmodule HubspotClient.Pipelines do
   `stages/4` to turn it into a human-readable label.
   """
 
-  alias HubspotClient.{Request, Response}
+  alias HubspotClient.{Request, Response, URL}
 
   @doc """
   Lists every pipeline for an object type.
@@ -34,7 +34,8 @@ defmodule HubspotClient.Pipelines do
   @spec get(HubspotClient.t(), String.t(), String.t() | integer(), keyword()) ::
           {:ok, map()} | {:error, Exception.t()}
   def get(client, object_type, pipeline_id, _opts \\ []) do
-    with {:ok, body} <- Request.get(client, base_path(object_type) <> "/" <> segment(pipeline_id)) do
+    with {:ok, body} <-
+           Request.get(client, base_path(object_type) <> "/" <> URL.segment(pipeline_id)) do
       {:ok, Response.metadata(body)}
     end
   end
@@ -45,14 +46,12 @@ defmodule HubspotClient.Pipelines do
   @spec stages(HubspotClient.t(), String.t(), String.t() | integer(), keyword()) ::
           {:ok, list(map())} | {:error, Exception.t()}
   def stages(client, object_type, pipeline_id, _opts \\ []) do
-    path = base_path(object_type) <> "/" <> segment(pipeline_id) <> "/stages"
+    path = base_path(object_type) <> "/" <> URL.segment(pipeline_id) <> "/stages"
 
     with {:ok, body} <- Request.get(client, path) do
       {:ok, Response.collection(body, &Response.metadata/1)}
     end
   end
 
-  defp base_path(object_type), do: "/crm/v3/pipelines/" <> segment(object_type)
-
-  defp segment(value), do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+  defp base_path(object_type), do: "/crm/v3/pipelines/" <> URL.segment(object_type)
 end
