@@ -28,7 +28,6 @@ defmodule HubspotClient.Objects do
   alias HubspotClient.{Request, Response}
 
   @param_keys [:limit, :after, :properties, :properties_with_history, :associations, :archived]
-  @stream_page_size 100
 
   @doc """
   Lists one page of objects.
@@ -62,9 +61,6 @@ defmodule HubspotClient.Objects do
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
     |> Enum.map(&encode_param/1)
   end
-
-  @doc false
-  def stream_page_size, do: @stream_page_size
 
   defp encode_param({:properties_with_history, value}), do: {:propertiesWithHistory, join(value)}
   defp encode_param({key, value}), do: {key, join(value)}
