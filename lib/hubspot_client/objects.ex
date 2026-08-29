@@ -51,6 +51,56 @@ defmodule HubspotClient.Objects do
     end
   end
 
+  @doc """
+  Searches objects.
+
+  The query is passed to HubSpot unchanged, so it accepts the full search body:
+  `"filterGroups"`, `"sorts"`, `"query"`, `"properties"`, `"limit"`, `"after"`.
+
+  HubSpot's constraints, which this function does not paper over:
+
+    * at most 200 records per page,
+    * at most 10,000 total results per query — paging past it returns a 400,
+    * at most 5 filterGroups with 6 filters each, 18 filters total,
+    * a request body of at most 3,000 characters,
+    * a shared burst limit of 5 requests per second across all search endpoints,
+      which is far tighter than the general limit. A 429 here means that one.
+  """
+  @spec search(HubspotClient.t(), String.t(), map()) ::
+          {:ok, %{results: list(map()), after: String.t() | nil}} | {:error, Exception.t()}
+  def search(client, type, query) when is_map(query) do
+    with {:ok, body} <- Request.post(client, base_path(type) <> "/search", query) do
+      {:ok, Response.paged(body, &Response.object/1)}
+    end
+  end
+
+  @doc """
+  Reads up to 100 objects by ID in one request.
+
+  Returns a plain list — the batch endpoint does not paginate. It also cannot
+  return associations; use `get/4` or `HubspotClient.Associations.list/5` for
+  those.
+
+  ## Options
+
+    * `:properties` - list of property names to return. Defaults to `[]`.
+    * `:id_property` - read by a custom unique property instead of the record ID.
+  """
+  @spec batch_read(HubspotClient.t(), String.t(), [String.t() | integer()], keyword()) ::
+          {:ok, list(map())} | {:error, Exception.t()}
+  def batch_read(client, type, ids, opts \\ []) when is_list(ids) do
+    body =
+      %{
+        "inputs" => Enum.map(ids, fn id -> %{"id" => to_string(id)} end),
+        "properties" => Keyword.get(opts, :properties, [])
+      }
+      |> maybe_put("idProperty", Keyword.get(opts, :id_property))
+
+    with {:ok, response} <- Request.post(client, base_path(type) <> "/batch/read", body) do
+      {:ok, Response.collection(response, &Response.object/1)}
+    end
+  end
+
   @doc false
   def base_path(type), do: "/crm/v3/objects/" <> segment(type)
 
@@ -71,4 +121,7 @@ defmodule HubspotClient.Objects do
   defp segment(value) do
     value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

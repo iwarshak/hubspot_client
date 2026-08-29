@@ -119,4 +119,104 @@ defmodule HubspotClient.ObjectsTest do
       assert {:ok, _} = Objects.get(client, "contacts", "a b")
     end
   end
+
+  describe "search/3" do
+    test "posts the query and decodes a page", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.method == "POST"
+        assert conn.request_path == "/crm/v3/objects/deals/search"
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw) == %{
+                 "filterGroups" => [
+                   %{
+                     "filters" => [
+                       %{
+                         "propertyName" => "dealstage",
+                         "operator" => "EQ",
+                         "value" => "closedwon"
+                       }
+                     ]
+                   }
+                 ],
+                 "properties" => ["dealname"],
+                 "limit" => 100
+               }
+
+        Req.Test.json(conn, %{
+          "total" => 1,
+          "results" => [%{"id" => "9", "properties" => %{"dealname" => "Won"}}]
+        })
+      end)
+
+      query = %{
+        "filterGroups" => [
+          %{
+            "filters" => [
+              %{"propertyName" => "dealstage", "operator" => "EQ", "value" => "closedwon"}
+            ]
+          }
+        ],
+        "properties" => ["dealname"],
+        "limit" => 100
+      }
+
+      assert {:ok, %{results: [%{id: "9"}], after: nil}} = Objects.search(client, "deals", query)
+    end
+
+    test "surfaces the 400 HubSpot returns past the 10,000 result cap", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        conn
+        |> Plug.Conn.put_status(400)
+        |> Req.Test.json(%{
+          "message" => "The paging limit is 10000",
+          "category" => "VALIDATION_ERROR"
+        })
+      end)
+
+      assert {:error, %HubspotClient.Error{status: 400, category: "VALIDATION_ERROR"}} =
+               Objects.search(client, "deals", %{"after" => "10001"})
+    end
+  end
+
+  describe "batch_read/4" do
+    test "posts ids as inputs and returns a plain list", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.request_path == "/crm/v3/objects/deals/batch/read"
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw) == %{
+                 "inputs" => [%{"id" => "1"}, %{"id" => "2"}],
+                 "properties" => ["dealname"]
+               }
+
+        Req.Test.json(conn, %{
+          "results" => [
+            %{"id" => "1", "properties" => %{"dealname" => "A"}},
+            %{"id" => "2", "properties" => %{"dealname" => "B"}}
+          ]
+        })
+      end)
+
+      assert {:ok, [%{id: "1"}, %{id: "2"}]} =
+               Objects.batch_read(client, "deals", [1, "2"], properties: ["dealname"])
+    end
+
+    test "reads by a custom unique property when id_property is given", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+
+        assert Jason.decode!(raw) == %{
+                 "inputs" => [%{"id" => "acme@example.com"}],
+                 "properties" => [],
+                 "idProperty" => "email"
+               }
+
+        Req.Test.json(conn, %{"results" => []})
+      end)
+
+      assert {:ok, []} =
+               Objects.batch_read(client, "contacts", ["acme@example.com"], id_property: "email")
+    end
+  end
 end
