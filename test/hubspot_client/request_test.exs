@@ -101,6 +101,38 @@ defmodule HubspotClient.RequestTest do
 
       assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
     end
+
+    test "req_options cannot change the HTTP method of a GET" do
+      client =
+        HubspotClient.new(
+          token: "t",
+          req_options: [plug: {Req.Test, HubspotClient}, retry: false, method: :delete]
+        )
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.method == "GET"
+        Req.Test.json(conn, %{})
+      end)
+
+      assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
+    end
+
+    test "req_options cannot smuggle a body into a GET" do
+      client =
+        HubspotClient.new(
+          token: "t",
+          req_options: [plug: {Req.Test, HubspotClient}, retry: false, json: %{"evil" => true}]
+        )
+
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.method == "GET"
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        assert body == ""
+        Req.Test.json(conn, %{})
+      end)
+
+      assert {:ok, _} = Request.get(client, "/crm/v3/objects/deals")
+    end
   end
 
   describe "post/3" do

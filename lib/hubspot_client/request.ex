@@ -8,13 +8,19 @@ defmodule HubspotClient.Request do
 
   alias HubspotClient.Error
 
+  # :req_options is an escape hatch for transport concerns — :plug in tests,
+  # :retry, :receive_timeout. It must never be able to reshape the request
+  # itself: this library is read-only, and a :method smuggled in here would
+  # turn a documented read into a write that still reports {:ok, _}.
+  @reserved_options [:method, :json, :body, :form]
+
   @doc """
   Issues a GET and returns the raw decoded body.
   """
   @spec get(HubspotClient.t(), String.t(), keyword()) :: {:ok, term()} | {:error, Exception.t()}
   def get(%HubspotClient{} = client, path, params \\ []) do
     client
-    |> build(url: path, params: params)
+    |> build(method: :get, url: path, params: params)
     |> run()
   end
 
@@ -33,7 +39,7 @@ defmodule HubspotClient.Request do
 
   defp build(client, options) do
     defaults(client)
-    |> Keyword.merge(client.req_options)
+    |> Keyword.merge(Keyword.drop(client.req_options, @reserved_options))
     |> Keyword.merge(options)
     |> Req.new()
   end
