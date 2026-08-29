@@ -158,6 +158,40 @@ defmodule HubspotClient.RequestTest do
       assert {:ok, %{"results" => []}} =
                Request.post(client, "/crm/v3/objects/deals/search", %{"limit" => 10})
     end
+
+    test "allows the batch-read endpoint", %{client: client} do
+      Req.Test.stub(HubspotClient, fn conn ->
+        assert conn.request_path == "/crm/v3/objects/p12345_widget/batch/read"
+        Req.Test.json(conn, %{"results" => []})
+      end)
+
+      assert {:ok, _} =
+               Request.post(client, "/crm/v3/objects/p12345_widget/batch/read", %{"inputs" => []})
+    end
+
+    for path <- [
+          "/crm/v3/objects/deals",
+          "/crm/v3/objects/deals/batch/create",
+          "/crm/v3/objects/deals/batch/update",
+          "/crm/v3/objects/deals/batch/archive",
+          "/crm/v3/objects/deals/merge",
+          "/crm/v4/associations/deals/companies/batch/create",
+          "/crm/v3/objects/deals/search/../batch/create",
+          "/crm/v3/objects/deals/search?x=1",
+          "/crm/v3/objects/deals/batch/read/../create"
+        ] do
+      test "refuses the write-shaped POST path #{path} without sending a request", %{
+        client: client
+      } do
+        Req.Test.stub(HubspotClient, fn _conn ->
+          flunk("request must not be sent")
+        end)
+
+        assert_raise ArgumentError, ~r/read-only/, fn ->
+          Request.post(client, unquote(path), %{"properties" => %{"dealname" => "x"}})
+        end
+      end
+    end
   end
 
   describe "telemetry" do

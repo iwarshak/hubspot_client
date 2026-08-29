@@ -143,6 +143,23 @@ response headers when present. The metadata carries `method` (`:get` or `:post`)
 `path`, and `status` (including 429s). The library does no proactive throttling —
 this event is what lets a caller throttle itself.
 
+## Read-only guarantees
+
+Every request goes through `HubspotClient.Request`, which is the only module
+that performs HTTP. It exposes `get/3` and `post/3` and nothing else — there is
+no PUT, PATCH, or DELETE anywhere in the library.
+
+HubSpot creates, updates, archives, and merges records via POST, so `post/3`
+is restricted to the two read endpoints that happen to require it:
+`/crm/v3/objects/{type}/search` and `/crm/v3/objects/{type}/batch/read`.
+Any other path raises `ArgumentError` before a request is sent. Object types,
+record IDs, and property names are percent-encoded as single path segments, so
+a caller-supplied value cannot re-route a request.
+
+`:req_options` cannot change this either: `:method`, `:json`, `:body`, and
+`:form` are stripped, and the library's own request options are applied after
+yours.
+
 ## Testing against this library
 
 Pass a `Req.Test` stub through `:req_options`:

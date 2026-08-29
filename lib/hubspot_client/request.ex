@@ -27,6 +27,13 @@ defmodule HubspotClient.Request do
   # turn a documented read into a write that still reports {:ok, _}.
   @reserved_options [:method, :json, :body, :form]
 
+  # HubSpot also creates, updates, archives, and merges records via POST, so
+  # `post/3` being public is only safe if the path itself is constrained. These
+  # are the only two POST endpoints this library uses, and both are reads. The
+  # object type is a single path segment: `HubspotClient.URL.segment/1` encodes
+  # `/`, `?`, and `#`, so no caller-supplied type can reach a different route.
+  @read_post_path ~r{\A/crm/v3/objects/[A-Za-z0-9._~%-]+/(search|batch/read)\z}
+
   @doc """
   Issues a GET and returns the raw decoded body.
   """
@@ -41,10 +48,19 @@ defmodule HubspotClient.Request do
   Issues a POST with a JSON body and returns the raw decoded body.
 
   Used only for HubSpot's read endpoints that require POST: object search and
-  batch read.
+  batch read. Any other path raises `ArgumentError` before a request is made —
+  this library is read-only, and HubSpot's create, update, archive, and merge
+  endpoints are all POSTs.
   """
   @spec post(HubspotClient.t(), String.t(), map()) :: {:ok, term()} | {:error, Exception.t()}
-  def post(%HubspotClient{} = client, path, body) when is_map(body) do
+  def post(%HubspotClient{} = client, path, body) when is_binary(path) and is_map(body) do
+    if not Regex.match?(@read_post_path, path) do
+      raise ArgumentError,
+            "HubspotClient is read-only: POST is permitted only to " <>
+              "/crm/v3/objects/{type}/search and /crm/v3/objects/{type}/batch/read, got: " <>
+              inspect(path)
+    end
+
     client
     |> build(method: :post, url: path, json: body)
     |> run()
