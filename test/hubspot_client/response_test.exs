@@ -71,6 +71,15 @@ defmodule HubspotClient.ResponseTest do
       assert Response.metadata(7) == 7
       assert Response.metadata(["a", "b"]) == ["a", "b"]
     end
+
+    test "atomizes a key this test never names as a literal" do
+      decoded = Response.metadata(%{"someUnfamiliarHubspotKey" => 1})
+
+      assert map_size(decoded) == 1
+      assert [key] = Map.keys(decoded)
+      assert is_atom(key)
+      assert Atom.to_string(key) == "some_unfamiliar_hubspot_key"
+    end
   end
 
   describe "paged/2" do

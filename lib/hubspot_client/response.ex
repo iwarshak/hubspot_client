@@ -78,9 +78,7 @@ defmodule HubspotClient.Response do
   defp metadata_value(key, value) when key in @timestamp_keys, do: timestamp(value)
   defp metadata_value(_key, value), do: metadata(value)
 
-  defp atomize(key) when is_binary(key),
-    do: key |> Macro.underscore() |> String.to_existing_atom()
-
+  defp atomize(key) when is_binary(key), do: key |> Macro.underscore() |> String.to_atom()
   defp atomize(key), do: key
 
   defp put_present(map, _key, nil), do: map
