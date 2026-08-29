@@ -9,11 +9,17 @@ deletes nothing.
 
 ## Installation
 
+This library is not published anywhere yet. Depend on it as a local path:
+
 ```elixir
 def deps do
-  [{:hubspot_client, "~> 0.1.0"}]
+  [{:hubspot_client, path: "../hubspot_client"}]
 end
 ```
+
+Adjust the path to wherever this repo lives relative to the consuming project.
+If you later push it to a git host, swap in `git: "<url>", tag: "v0.1.0"`; if
+you publish it to Hex, add a `package/0` to `mix.exs` first.
 
 ## Getting a token
 
@@ -99,7 +105,8 @@ HubSpot fixes, so its keys become atoms: `pipeline.display_order`,
 `property.field_type`, `owner.first_name`.
 
 Endpoints that paginate return `%{results: [...], after: cursor_or_nil}`.
-Endpoints that do not (pipelines, stages, properties) return a plain list.
+Endpoints that do not (pipelines, stages, properties, and batch read) return a
+plain list.
 
 ### Errors
 

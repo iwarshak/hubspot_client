@@ -19,7 +19,11 @@ defmodule HubspotClient.Objects do
       default set when this is omitted, which often will not include the fields
       you want; ask for them explicitly.
     * `:properties_with_history` - list of property names to return with history.
-    * `:associations` - list of object types to return associated IDs for.
+    * `:associations` - list of object types to return associated IDs for. The
+      returned `:associations` map is passed through raw and string-keyed
+      (e.g. `%{"companies" => %{"results" => [%{"id" => ..., "type" => ...}]}}`),
+      unlike `HubspotClient.Associations.list/5`, which normalizes to atom keys
+      (`%{to_object_id: ..., association_types: [...]}`).
     * `:archived` - `true` to return archived records instead of active ones.
 
   Unrecognized options are ignored rather than forwarded.

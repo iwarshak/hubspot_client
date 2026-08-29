@@ -7,7 +7,12 @@ defmodule HubspotClient.Response do
     * **CRM objects** — `object/1` atomizes the fixed envelope (`id`,
       `createdAt`, `updatedAt`, `archived`) and leaves `properties` exactly as
       HubSpot sent it, string-keyed. Property names are defined by your portal
-      and are therefore unbounded; turning them into atoms would leak.
+      and are therefore unbounded; turning them into atoms would leak. When
+      `associations` was requested, that block is also passed through raw and
+      string-keyed (e.g. `%{"companies" => %{"results" => [%{"id" => ...,
+      "type" => ...}]}}`) — its top-level keys are object type names, which for
+      custom objects are portal-defined, so this is the one place the "keys
+      HubSpot defines become atoms" rule below does not hold.
 
     * **Metadata** — `metadata/1` recursively converts camelCase keys to
       snake_case atoms. Pipelines, stages, property definitions, owners, and
