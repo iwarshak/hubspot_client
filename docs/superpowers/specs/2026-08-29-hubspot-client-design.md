@@ -77,7 +77,8 @@ effect, not HTTP verb.
 
 ```
 HubspotClient              new/1 -> %HubspotClient{}
-HubspotClient.Request      builds and executes Req; normalizes responses and errors
+HubspotClient.Request      builds and executes Req; maps status codes to errors
+HubspotClient.Response     decodes bodies into normalized maps
 HubspotClient.Objects      list/3 get/4 search/3 batch_read/4 stream/3 (generic)
 HubspotClient.Deals        thin delegations to Objects with "deals"
 HubspotClient.Companies    thin delegations to Objects with "companies"
@@ -90,7 +91,9 @@ HubspotClient.Associations list/5
 HubspotClient.Error        %Error{} exception struct
 ```
 
-`HubspotClient.Request` is the only module that performs HTTP. Every other module
+`HubspotClient.Request` is the only module that performs HTTP, and
+`HubspotClient.Response` is the only module that decodes bodies. Splitting them
+keeps decoding testable without stubbing a socket. Every other module
 builds a path and options and hands them over. This keeps auth, retry, decoding, and
 error mapping in one place and makes the resource modules trivial to read and test.
 
@@ -125,9 +128,12 @@ freely.
 Every function returns `{:ok, term}` or `{:error, term}`. The single exception is
 `stream/2` and `stream/3`, which raise mid-iteration as described under Pagination.
 
-Responses decode to plain maps. Envelope keys are atomized; `properties` stays
-string-keyed so custom HubSpot properties pass through untouched and no atom is
-created from portal-controlled input.
+Responses decode to plain maps under one rule: **keys HubSpot defines become
+atoms; keys your portal defines stay strings.**
+
+For CRM objects that means the envelope is atomized while `properties` stays
+string-keyed, so custom properties pass through untouched and no atom is created
+from portal-controlled input.
 
 ```elixir
 %{
@@ -139,12 +145,20 @@ created from portal-controlled input.
 }
 ```
 
+For metadata resources — pipelines, stages, property definitions, owners,
+associations — the whole payload is atomized, recursively, camelCase to
+snake_case: `pipeline.display_order`, `property.field_type`, `owner.first_name`.
+Their key sets are fixed by HubSpot and therefore bounded, so this creates no
+atom-exhaustion risk. Portal-defined property names appear in these payloads only
+as string *values* (under `:name`), never as keys.
+
 `createdAt` and `updatedAt` parse to `DateTime`. Timestamps that fail to parse pass
 through as the original string rather than failing the request.
 
-Endpoints that paginate — object lists, search, owners — return the envelope
-`%{results: [...], after: cursor_or_nil}`. Endpoints that do not paginate — pipelines,
-pipeline stages, properties, associations — return a plain list, `{:ok, [...]}`. The
+Endpoints that paginate — object lists, search, owners, and v4 associations —
+return the envelope `%{results: [...], after: cursor_or_nil}`. Endpoints that do not
+paginate — pipelines, pipeline stages, properties, and batch read — return a plain
+list, `{:ok, [...]}`. The
 shape tells the caller whether there is more to fetch, so a cursor is never invented
 for an endpoint that has none.
 
